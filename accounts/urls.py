@@ -8,9 +8,3 @@ auth_patterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('refresh-token/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
-user_patterns = [
-    path('my-profile/', MyProfileView.as_view(), name='my_profile'),
-    path('edit-profile/', EditProfileView.as_view(), name='edit_profile'),
-]
-
-urlpatterns = auth_patterns + user_patterns
