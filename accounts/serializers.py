@@ -11,6 +11,11 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'email', 'phone', 'address']
         read_only_fields = ['email']
 
+class ProfileImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['profile_image']
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     
