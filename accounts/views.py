@@ -4,10 +4,11 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework import generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from .serializers import RegisterSerializer, CustomTokenObtainPairSerializer, UserSerializer
+from .serializers import ProfileImageSerializer, RegisterSerializer, CustomTokenObtainPairSerializer, UserSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from .models import Wallet
 
 User = get_user_model()
 
@@ -30,6 +31,7 @@ class SignUpView(generics.CreateAPIView):
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             user = serializer.save()
+            Wallet.objects.create(user=user, balance=0)
             
             return Response({
                 'status': 200,
@@ -102,6 +104,58 @@ class MyProfileView(generics.RetrieveAPIView):
             }, status = status.HTTP_400_BAD_REQUEST)
 
 
+
+class UploadProfileImageView(generics.UpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProfileImageSerializer
+
+    def get_object(self):
+        return self.request.user
+    @swagger_auto_schema(
+        operation_description="Upload profile image.",
+        security=[{'Bearer': []}],
+        responses={
+            200: ProfileImageSerializer,
+            400: "Bad Request",
+            401: "Unauthorized",
+            404: "Not Found"
+        },
+        tags=['Profile'],
+    )
+
+    def update(self, request, *args, **kwargs):
+        try:
+            user = self.get_object()
+            had_profile_image = bool(user.profile_image)
+            serializer = self.get_serializer(user, data=request.data, partial=True)
+            if serializer.is_valid(raise_exception=True):
+                self.perform_update(serializer)
+                user.refresh_from_db()
+                user_wallet, created = Wallet.objects.get_or_create(
+                    user=user,
+                    defaults={'balance': 0, 'currency': 'Gems'}
+                )
+
+                if not had_profile_image and user.profile_image:
+                    reward_points = 3
+                    user_wallet.balance += reward_points
+                    user_wallet.save()
+                    
+                return Response({
+                    'status': 200,
+                    'message': 'Profile image uploaded successfully',
+                    "data": {
+                    "cloudinary_url": user.profile_image.url,
+                    "wallet_balance": user_wallet.balance,
+                    "currency": user_wallet.currency
+                }
+                }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                'status': 400, 'message': str(e)
+            }, status = status.HTTP_400_BAD_REQUEST)
+
+
 class EditProfileView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = UserSerializer
@@ -131,7 +185,7 @@ class EditProfileView(generics.UpdateAPIView):
                 'status': 200,
                 'message': f'Profile updated successfully for user {instance.email}',
                 'data': serializer.data
-            })
+            }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({
                 'status': 400, 'message': str(e)
