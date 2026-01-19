@@ -1,5 +1,5 @@
-Django==5.0
-djangorestframework
-djangorestframework-simplejwt
-python-dotenv
-drf-yasg
+Django==5.2.10
+djangorestframework==3.16.1
+djangorestframework-simplejwt==5.5.1
+python-dotenv==1.2.0
+drf-yasg==1.21.14
