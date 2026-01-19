@@ -9,6 +9,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'name', 'email', 'phone', 'address']
+        read_only_fields = ['email']
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -29,6 +30,25 @@ class RegisterSerializer(serializers.ModelSerializer):
         if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", value):
             raise serializers.ValidationError("Password must contain at least one special character.")
         return value
+    
+    def validate_phone(self, value):
+        if not value:
+            return value
+        if not re.match(r'^\+\d+$', value):
+            raise serializers.ValidationError("Phone number must start with '+' and contain only digits.")
+        if not (10 <= len(value) <= 16):
+            raise serializers.ValidationError("Phone number must be between 10 and 16 digits.")
+        if User.objects.filter(phone=value).exists():
+            raise serializers.ValidationError("Phone number already exists.")
+        return value
+    
+    def validate_email(self, value):
+        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_regex, value):
+            raise serializers.ValidationError("Enter a valid email address.")
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email already registered.")
+        return value.lower()
 
     def create(self, validated_data):
         user = User.objects.create_user(
