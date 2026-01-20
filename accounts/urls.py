@@ -13,5 +13,5 @@ urlpatterns = [
     path('profile/', MyProfileView.as_view(), name='my_profile'),
     path('profile/edit/', EditProfileView.as_view(), name='edit_profile'),
     path('upload-image/', UploadProfileImageView.as_view(), name='upload-image'),
-    path('delete-image/', DeleteProfileImageView.as_view(), name='delete-image'),
+    path('delete-image/<int:pk>/', DeleteProfileImageView.as_view(), name='delete-image'),
 ]
