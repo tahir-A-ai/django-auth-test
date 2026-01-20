@@ -5,3 +5,4 @@ python-dotenv==1.2.0
 drf-yasg==1.21.14
 django-cloudinary-storage==0.3.0
 cloudinary==1.44.1
+pillow==12.1.0
