@@ -22,7 +22,7 @@ class CustomUserAdmin(UserAdmin):
             'fields': (
                 'name', 'phone', 'address', 
                 'profile_image',        
-                'profile_image_preview'
+                'cloudinary_preview'
             )
         }),
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
@@ -36,19 +36,23 @@ class CustomUserAdmin(UserAdmin):
         }),
     )
 
-    readonly_fields = ('last_login', 'date_joined', 'profile_image_preview')
+    readonly_fields = ('last_login', 'date_joined', 'cloudinary_preview')
 
     def view_profile_link(self, obj):
-        if obj.profile_image:
-            return format_html('<a href="{}" target="_blank">View Image</a>', obj.profile_image.url)
+        if obj.cloudinary_url:
+            return format_html('<a href="{}" target="_blank">View Image</a>', obj.cloudinary_url)
         return "-"
     view_profile_link.short_description = "Profile Image"
 
-    def profile_image_preview(self, obj):
-        if obj.profile_image:
-            return obj.profile_image.url
-        return "No Image Uploaded"
-    profile_image_preview.short_description = "Image URL (Cloudinary)"
+    def cloudinary_preview(self, obj):
+        if obj.cloudinary_url:
+            return format_html(
+                '<a href="{}" target="_blank">{}</a>', 
+                obj.cloudinary_url, 
+                obj.cloudinary_url
+            )
+        return "No Cloudinary Upload"
+    cloudinary_preview.short_description = "Cloudinary URL"
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
