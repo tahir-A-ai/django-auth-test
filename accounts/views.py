@@ -10,6 +10,8 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from .models import Wallet
 from rest_framework.parsers import MultiPartParser, FormParser
+import cloudinary.uploader
+import os
 
 User = get_user_model()
 
@@ -139,8 +141,20 @@ class UploadProfileImageView(generics.UpdateAPIView):
             had_profile_image = bool(user.profile_image)
             serializer = self.get_serializer(user, data=request.data, partial=True)
             if serializer.is_valid(raise_exception=True):
-                self.perform_update(serializer)
+                serializer.save()
                 user.refresh_from_db()
+
+                local_file_path = user.profile_image.path
+                if local_file_path and os.path.exists(local_file_path):
+                    upload_response = cloudinary.uploader.upload(
+                        local_file_path, 
+                        folder="user_profiles"
+                    )  
+
+                user.cloudinary_url = upload_response.get('secure_url')
+                user.cloudinary_public_id = upload_response.get('public_id')
+                user.save()
+
                 user_wallet, created = Wallet.objects.get_or_create(
                     user=user,
                     defaults={'balance': 0, 'currency': 'Gems'}
@@ -150,21 +164,63 @@ class UploadProfileImageView(generics.UpdateAPIView):
                     reward_points = 3
                     user_wallet.balance += reward_points
                     user_wallet.save()
-                    
+
                 return Response({
                     'status': 200,
                     'message': 'Profile image uploaded successfully',
-                    "data": {
-                    "cloudinary_url": user.profile_image.url,
-                    "wallet_balance": user_wallet.balance,
-                    "currency": user_wallet.currency
-                }
-                }, status=status.HTTP_200_OK)
+                    "data": { 
+                    "cloudinary_url": user.cloudinary_url
+                }}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({
                 'status': 400, 'message': str(e)
             }, status = status.HTTP_400_BAD_REQUEST)
 
+
+class DeleteProfileImageView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    
+    @swagger_auto_schema(
+         operation_description="Delete profile image.",
+         responses={
+             200: "ok",
+             400: "Bad Request",
+             401: "Unauthorized",
+             404: "Not Found"
+         },
+     )
+    
+    def delete(self, request, *args, **kwargs):
+        user = self.request.user
+        if not user.profile_image and not user.cloudinary_public_id:
+             return Response({
+                "status": "error",
+                "message": "No profile image found to delete."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            if user.cloudinary_public_id:
+                cloudinary.uploader.destroy(user.cloudinary_public_id)
+            if user.profile_image:
+                local_path = user.profile_image.path
+                if os.path.exists(local_path):
+                    os.remove(local_path)
+
+            user.profile_image = None
+            user.cloudinary_url = None
+            user.cloudinary_public_id = None
+            user.save()
+
+            return Response({
+                "status": "success",
+                "message": "Profile image deleted from Cloud and Local storage."
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                "status": "error", 
+                "message": str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
 
 class EditProfileView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated]
