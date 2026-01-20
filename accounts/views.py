@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework import generics
@@ -107,10 +107,9 @@ class MyProfileView(generics.RetrieveAPIView):
 
 
 
-class UploadProfileImageView(generics.UpdateAPIView):
+class UploadProfileImageView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ProfileImageSerializer
-
     parser_classes = [MultiPartParser, FormParser]
 
     def get_object(self):
@@ -135,32 +134,36 @@ class UploadProfileImageView(generics.UpdateAPIView):
         tags=['Profile'],
     )
 
-    def update(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         try:
             user = self.get_object()
-            had_profile_image = bool(user.profile_image)
+            had_profile_image = bool(user.profile_image) 
+            if user.cloudinary_public_id:
+                cloudinary.uploader.destroy(user.cloudinary_public_id)
+            if user.profile_image:
+                old_local_path = user.profile_image.path
+                if os.path.exists(old_local_path):
+                    os.remove(old_local_path)
+
             serializer = self.get_serializer(user, data=request.data, partial=True)
             if serializer.is_valid(raise_exception=True):
                 serializer.save()
-                user.refresh_from_db()
 
                 local_file_path = user.profile_image.path
                 if local_file_path and os.path.exists(local_file_path):
                     upload_response = cloudinary.uploader.upload(
-                        local_file_path, 
+                        local_file_path,
                         folder="user_profiles"
-                    )  
-
-                user.cloudinary_url = upload_response.get('secure_url')
-                user.cloudinary_public_id = upload_response.get('public_id')
-                user.save()
+                    )
+                    user.cloudinary_url = upload_response.get('secure_url')
+                    user.cloudinary_public_id = upload_response.get('public_id')
+                    user.save()
 
                 user_wallet, created = Wallet.objects.get_or_create(
                     user=user,
                     defaults={'balance': 0, 'currency': 'Gems'}
                 )
-
-                if not had_profile_image and user.profile_image:
+                if not had_profile_image: 
                     reward_points = 3
                     user_wallet.balance += reward_points
                     user_wallet.save()
@@ -168,56 +171,57 @@ class UploadProfileImageView(generics.UpdateAPIView):
                 return Response({
                     'status': 200,
                     'message': 'Profile image uploaded successfully',
-                    "data": { 
-                    "cloudinary_url": user.cloudinary_url
-                }}, status=status.HTTP_200_OK)
+                    "data": {
+                        "cloudinary_url": user.cloudinary_url,
+                    }
+                }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({
                 'status': 400, 'message': str(e)
-            }, status = status.HTTP_400_BAD_REQUEST)
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 
 class DeleteProfileImageView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
-    
+
     @swagger_auto_schema(
          operation_description="Delete profile image.",
          responses={
-             200: "ok",
+             200: "success",
              400: "Bad Request",
              401: "Unauthorized",
              404: "Not Found"
          },
      )
-    
-    def delete(self, request, *args, **kwargs):
-        user = self.request.user
-        if not user.profile_image and not user.cloudinary_public_id:
+
+    def delete(self, request, pk, *args, **kwargs):
+        user_to_delete = get_object_or_404(User, pk=pk)
+        if not user_to_delete.profile_image and not user_to_delete.cloudinary_public_id:
              return Response({
                 "status": "error",
                 "message": "No profile image found to delete."
             }, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            if user.cloudinary_public_id:
-                cloudinary.uploader.destroy(user.cloudinary_public_id)
-            if user.profile_image:
-                local_path = user.profile_image.path
+            if user_to_delete.cloudinary_public_id:
+                cloudinary.uploader.destroy(user_to_delete.cloudinary_public_id)
+            if user_to_delete.profile_image:
+                local_path = user_to_delete.profile_image.path
                 if os.path.exists(local_path):
                     os.remove(local_path)
 
-            user.profile_image = None
-            user.cloudinary_url = None
-            user.cloudinary_public_id = None
-            user.save()
+            user_to_delete.profile_image = None
+            user_to_delete.cloudinary_url = None
+            user_to_delete.cloudinary_public_id = None
+            user_to_delete.save()
 
             return Response({
                 "status": "success",
-                "message": "Profile image deleted from Cloud and Local storage."
+                "message": "Profile image deleted successfully."
             }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({
-                "status": "error", 
+                "status": "error",
                 "message": str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
         
