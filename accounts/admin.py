@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.html import format_html
 from .models import User, Wallet
+import cloudinary.uploader
+import os
 
 class CustomUserAdmin(UserAdmin):
     model = User
@@ -54,10 +56,24 @@ class CustomUserAdmin(UserAdmin):
         return "No Cloudinary Upload"
     cloudinary_preview.short_description = "Cloudinary URL"
 
+
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         if not change:
             Wallet.objects.get_or_create(user=obj, defaults={'balance': 0, 'currency': 'Gems'})
+        if 'profile_image' in form.changed_data and obj.profile_image:
+            try:
+                local_path = obj.profile_image.path
+                if os.path.exists(local_path):
+                    upload_response = cloudinary.uploader.upload(
+                    local_path,
+                    folder="user_profiles"
+                )
+                obj.cloudinary_url = upload_response.get('secure_url')
+                obj.cloudinary_public_id = upload_response.get('public_id')
+                obj.save(update_fields=['cloudinary_url', 'cloudinary_public_id'])
+            except Exception as e:
+                print(f"Error uploading to Cloudinary: {e}")
 
 
 class WalletAdmin(admin.ModelAdmin):
