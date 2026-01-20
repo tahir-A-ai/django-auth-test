@@ -9,6 +9,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from .models import Wallet
+from rest_framework.parsers import MultiPartParser, FormParser
 
 User = get_user_model()
 
@@ -77,7 +78,6 @@ class MyProfileView(generics.RetrieveAPIView):
     serializer_class = UserSerializer
     @swagger_auto_schema(
         operation_description="Get my profile.",
-        security=[{'Bearer': []}],
         responses={
             200: UserSerializer,
             401: "Unauthorized",
@@ -109,11 +109,21 @@ class UploadProfileImageView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ProfileImageSerializer
 
+    parser_classes = [MultiPartParser, FormParser]
+
     def get_object(self):
         return self.request.user
     @swagger_auto_schema(
         operation_description="Upload profile image.",
-        security=[{'Bearer': []}],
+        manual_parameters=[
+            openapi.Parameter(
+                'profile_image',
+                openapi.IN_FORM,
+                type=openapi.TYPE_FILE,
+                required=True,
+                description='Profile image file'
+            )
+        ],
         responses={
             200: ProfileImageSerializer,
             400: "Bad Request",
@@ -161,7 +171,6 @@ class EditProfileView(generics.UpdateAPIView):
     serializer_class = UserSerializer
     @swagger_auto_schema(
         operation_description="Edit my profile.",
-        security=[{'Bearer': []}],
         responses={
             200: UserSerializer,
             400: "Bad Request",
