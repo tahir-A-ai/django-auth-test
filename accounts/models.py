@@ -9,7 +9,9 @@ class User(AbstractUser):
     email = models.EmailField(max_length=254, unique=True)
     phone = models.CharField(max_length=16, default='', blank=True)
     address = models.TextField(blank=True, null=True)
-    profile_image = CloudinaryField('image', blank=True, null=True)
+    profile_image = models.ImageField(upload_to='profiles/', blank=True, null=True)
+    cloudinary_url = models.URLField(blank=True, null=True)
+    cloudinary_public_id = models.CharField(max_length=100, blank=True, null=True)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['name', 'username']
