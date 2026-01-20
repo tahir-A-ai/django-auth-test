@@ -50,6 +50,20 @@ class CustomUserAdmin(UserAdmin):
         return "No Image Uploaded"
     profile_image_preview.short_description = "Image URL (Cloudinary)"
 
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if not change:
+            Wallet.objects.get_or_create(user=obj, defaults={'balance': 0, 'currency': 'Gems'})
+
+
+class WalletAdmin(admin.ModelAdmin):
+    fields = ('user_id_display', 'user', 'balance', 'currency', 'created_at', 'updated_at')
+    readonly_fields = ('user_id_display', 'created_at', 'updated_at')
+    list_display = ('user_id_display', 'user', 'balance', 'currency', 'created_at', 'updated_at')
+    def user_id_display(self, obj):
+        return obj.user.id
+    user_id_display.short_description = 'User ID'
+
 
 admin.site.register(User, CustomUserAdmin)
-admin.site.register(Wallet)
+admin.site.register(Wallet, WalletAdmin)
